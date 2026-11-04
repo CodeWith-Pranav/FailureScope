@@ -1,5 +1,7 @@
 # FailureScope
 
+Live demo: https://failurescope.vercel.app/
+
 A reproducible machine-failure classification dashboard with real trained logistic-regression and random-forest models. Inspect an observation, score a CSV batch, explore threshold tradeoffs, compare frozen models and save policy experiments in your browser.
 
 ## Run
