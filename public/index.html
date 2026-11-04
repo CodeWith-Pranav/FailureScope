@@ -1,0 +1,1804 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="A reproducible machine-failure classification lab: trained models, threshold tradeoffs and transparent evaluation."
+    />
+    <title>FailureScope — See the tradeoff</title>
+    <style>
+      :root {
+        --ink: #162c39;
+        --muted: #687a84;
+        --line: #dce3e5;
+        --paper: #f5f6f4;
+        --orange: #d78b28;
+        --teal: #087e80;
+        --nav: #142d3a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          14px/1.55 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 0;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.6;
+      }
+      a {
+        color: var(--teal);
+      }
+      aside {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 224px;
+        background: var(--nav);
+        color: #fff;
+        padding: 30px 22px;
+        display: flex;
+        flex-direction: column;
+      }
+      .brand {
+        font-weight: 750;
+        font-size: 24px;
+        letter-spacing: -1px;
+        color: #fff;
+        text-decoration: none;
+      }
+      .brand i {
+        color: #f4b452;
+        font-style: normal;
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 2px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .sidebar-caption {
+        color: #a9c1cd;
+        margin: 3px 0 45px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 14px;
+        margin: 5px 0;
+        text-align: left;
+        border-radius: 7px;
+        color: #b9cbd3;
+        background: transparent;
+      }
+      .nav.active {
+        background: #294452;
+        color: #fff;
+      }
+      .nav.active span {
+        color: #ffc66e;
+      }
+      .nav span {
+        font-size: 17px;
+      }
+      .aside-foot {
+        margin-top: auto;
+        color: #b1c4cd;
+        font-size: 12px;
+        border-top: 1px solid #3b535f;
+        padding-top: 22px;
+      }
+      .aside-foot b {
+        color: #f6c275;
+      }
+      main {
+        margin-left: 224px;
+        padding: 0 38px 35px;
+        max-width: 1600px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        min-height: 76px;
+        color: var(--muted);
+        font-size: 12px;
+        gap: 15px;
+      }
+      .pill {
+        background: #e7eeec;
+        border: 1px solid #d4dfda;
+        border-radius: 30px;
+        padding: 6px 12px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .pill::before {
+        content: "●";
+        color: var(--teal);
+        margin-right: 7px;
+      }
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: center;
+        padding: 35px 0 27px;
+      }
+      h1 {
+        font-size: 34px;
+        letter-spacing: -1.3px;
+        line-height: 1.2;
+        margin: 12px 0;
+      }
+      h1 em {
+        font-style: normal;
+        color: var(--teal);
+      }
+      p {
+        color: var(--muted);
+        margin: 8px 0;
+      }
+      .hero p {
+        max-width: 640px;
+      }
+      .hero .eyebrow {
+        color: #907345;
+      }
+      .button {
+        background: var(--teal);
+        color: #fff;
+        border-radius: 6px;
+        padding: 12px 18px;
+        font-weight: 650;
+        display: inline-block;
+      }
+      .button.secondary {
+        background: #fff;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .button.small {
+        font-size: 12px;
+        padding: 8px 12px;
+      }
+      .warning {
+        border-left: 3px solid var(--orange);
+        background: #fff5e5;
+        padding: 12px 16px;
+        font-size: 12px;
+        color: #755422;
+        border-radius: 0 5px 5px 0;
+        margin-bottom: 24px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 23px;
+      }
+      .card,
+      .panel {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+      .card {
+        padding: 20px;
+      }
+      .card small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .card strong {
+        display: block;
+        font-size: 29px;
+        letter-spacing: -1px;
+        margin: 6px 0;
+      }
+      .card span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .panel {
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+      .panel h2 {
+        font-size: 17px;
+        margin: 0;
+      }
+      .panel h3 {
+        font-size: 14px;
+        margin: 0;
+      }
+      .panel-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+      .panel-top p {
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        gap: 20px;
+      }
+      .inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 650;
+        color: #506471;
+      }
+      input,
+      select,
+      textarea {
+        min-width: 0;
+        width: 100%;
+        background: #fff;
+        border: 1px solid #cdd8dd;
+        border-radius: 5px;
+        padding: 10px 11px;
+        color: var(--ink);
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid #8bc7c4;
+        outline-offset: 1px;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #e8ad53;
+        outline-offset: 3px;
+      }
+      .field-note {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .controls {
+        display: flex;
+        align-items: flex-end;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .controls label {
+        min-width: 160px;
+        flex: 1;
+      }
+      .controls .threshold {
+        min-width: 230px;
+        flex: 1.5;
+      }
+      input[type="range"] {
+        accent-color: var(--teal);
+        padding: 7px 0;
+        border: 0;
+      }
+      .form-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+      .result-box {
+        background: #f2f7f5;
+        border: 1px solid #d8e7e1;
+        padding: 25px;
+        border-radius: 7px;
+        min-height: 190px;
+      }
+      .score {
+        font-size: 49px;
+        letter-spacing: -2px;
+        font-weight: 750;
+        margin: 4px 0;
+      }
+      .score small {
+        font-size: 15px;
+        letter-spacing: 0;
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .flag {
+        display: inline-block;
+        border-radius: 4px;
+        font-size: 11px;
+        letter-spacing: 0.3px;
+        background: #dceee5;
+        color: #25604c;
+        padding: 4px 8px;
+        font-weight: 700;
+      }
+      .flag.high {
+        background: #ffe6bc;
+        color: #8b5311;
+      }
+      .meter {
+        height: 8px;
+        border-radius: 7px;
+        background: #d8e3df;
+        margin: 16px 0;
+        overflow: hidden;
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+        background: var(--teal);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .error {
+        color: #a42626;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .status {
+        font-size: 12px;
+        color: var(--teal);
+      }
+      .hint-list {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: #7e5c1c;
+        font-size: 12px;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--line);
+        gap: 24px;
+        margin-bottom: 23px;
+      }
+      .tab {
+        background: transparent;
+        padding: 12px 0;
+        color: var(--muted);
+        border-bottom: 2px solid transparent;
+      }
+      .tab.active {
+        color: var(--teal);
+        border-color: var(--teal);
+        font-weight: 700;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        text-align: left;
+      }
+      th {
+        font-weight: 650;
+        color: var(--muted);
+        background: #f6f8f7;
+        font-size: 10px;
+        letter-spacing: 0.7px;
+        padding: 12px;
+      }
+      td {
+        padding: 13px 12px;
+        border-bottom: 1px solid #e8eeee;
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      code {
+        font-size: 11px;
+        background: #eef2f2;
+        border-radius: 3px;
+        padding: 2px 5px;
+      }
+      .matrix {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .cell {
+        padding: 19px;
+        border-radius: 6px;
+        background: #f0f6f3;
+      }
+      .cell.bad {
+        background: #fff3e6;
+      }
+      .cell strong {
+        font-size: 28px;
+        display: block;
+      }
+      .cell span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .chart {
+        width: 100%;
+        height: auto;
+        max-height: 260px;
+        overflow: visible;
+      }
+      .legend {
+        display: flex;
+        gap: 22px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .legend b {
+        color: var(--teal);
+      }
+      .legend i {
+        color: var(--orange);
+        font-style: normal;
+      }
+      .importance {
+        display: grid;
+        grid-template-columns: 135px 1fr 52px;
+        gap: 10px;
+        align-items: center;
+        font-size: 11px;
+        margin: 14px 0;
+      }
+      .bar {
+        height: 7px;
+        background: #edf2f2;
+        border-radius: 5px;
+      }
+      .bar span {
+        display: block;
+        background: #72aaa5;
+        height: 100%;
+        border-radius: 5px;
+      }
+      .version {
+        font-family: monospace;
+        font-size: 11px;
+        color: var(--teal);
+      }
+      .empty {
+        padding: 35px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .saved-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 17px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .saved-row h3 {
+        margin-bottom: 3px;
+      }
+      .saved-row div:last-child {
+        display: flex;
+        gap: 7px;
+      }
+      .model-note {
+        padding: 17px;
+        background: #f6f8f7;
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 17px;
+      }
+      .loading {
+        padding: 60px;
+        text-align: center;
+        color: var(--muted);
+      }
+      footer {
+        font-size: 11px;
+        color: #7f9098;
+        padding-top: 7px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      textarea {
+        height: 170px;
+        font-family: monospace;
+        font-size: 12px;
+        resize: vertical;
+      }
+      .batch-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 18px 0;
+      }
+      .batch-actions input {
+        max-width: 280px;
+        font-size: 12px;
+      }
+      .notice {
+        font-size: 12px;
+        background: #edf5f5;
+        padding: 15px;
+        border-radius: 5px;
+        color: #3a6066;
+        margin-bottom: 20px;
+      }
+      .split {
+        display: flex;
+        height: 13px;
+        border-radius: 6px;
+        overflow: hidden;
+        margin: 20px 0 10px;
+      }
+      .split span:nth-child(1) {
+        width: 60%;
+        background: var(--teal);
+      }
+      .split span:nth-child(2) {
+        width: 20%;
+        background: #e7ac50;
+      }
+      .split span:nth-child(3) {
+        width: 20%;
+        background: #8196a3;
+      }
+      .saved-input {
+        max-width: 320px;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      details {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 0;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 650;
+        font-size: 12px;
+      }
+      details p {
+        font-size: 12px;
+      }
+      .ghost {
+        border: 1px dashed #c5d2d6;
+        border-radius: 7px;
+        padding: 18px;
+        margin-top: 20px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 1050px) {
+        aside {
+          width: 190px;
+          padding: 24px 16px;
+        }
+        main {
+          margin-left: 190px;
+          padding: 0 24px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .cards {
+          gap: 10px;
+        }
+        .card {
+          padding: 15px;
+        }
+        .card strong {
+          font-size: 25px;
+        }
+      }
+      @media (max-width: 700px) {
+        aside {
+          position: static;
+          width: 100%;
+          padding: 14px 16px;
+          display: block;
+        }
+        .brand {
+          font-size: 21px;
+        }
+        .sidebar-caption,
+        .aside-foot,
+        .workspace-label {
+          display: none;
+        }
+        nav {
+          display: flex;
+          gap: 4px;
+          overflow: auto;
+          margin-top: 12px;
+        }
+        .nav {
+          width: auto;
+          white-space: nowrap;
+          font-size: 11px;
+          padding: 9px;
+        }
+        .nav span {
+          display: none;
+        }
+        main {
+          margin-left: 0;
+          padding: 0 16px 25px;
+        }
+        header {
+          min-height: 55px;
+        }
+        .hero {
+          padding: 24px 0;
+          display: block;
+        }
+        .hero .button {
+          margin-top: 15px;
+        }
+        h1 {
+          font-size: 29px;
+        }
+        .cards {
+          grid-template-columns: 1fr 1fr;
+        }
+        .panel {
+          padding: 18px;
+        }
+        .inputs {
+          gap: 13px;
+        }
+        .controls label {
+          min-width: 130px;
+        }
+        .panel-top {
+          align-items: flex-start;
+        }
+        .importance {
+          grid-template-columns: 120px 1fr 40px;
+        }
+        .saved-row {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .score {
+          font-size: 42px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <a class="brand" href="/"
+        >Failure<i>Scope</i
+        ><span style="font-size: 12px; margin-left: 4px">◒</span></a
+      >
+      <p class="sidebar-caption eyebrow">Machine intelligence lab</p>
+      <span class="eyebrow workspace-label" style="color: #819da9"
+        >Workspace</span
+      >
+      <nav aria-label="Workspace">
+        <button class="nav active" data-view="predict">
+          <span>⌁</span>Prediction lab</button
+        ><button class="nav" data-view="evaluate">
+          <span>◫</span>Model evaluation</button
+        ><button class="nav" data-view="experiments">
+          <span>⊞</span>Saved experiments</button
+        ><button class="nav" data-view="card"><span>◎</span>Model card</button>
+      </nav>
+      <div class="aside-foot">
+        <b>Beyond an accuracy score.</b>
+        <p style="color: #a9bdc7">
+          Inspect what the model catches, what it misses and where its evidence
+          ends.
+        </p>
+        <div>UCI AI4I 2020 · Synthetic data</div>
+      </div>
+    </aside>
+    <main>
+      <header>
+        <span>Workspace / <b id="crumb">Prediction lab</b></span
+        ><span class="pill">Frozen models · v1.0</span>
+      </header>
+      <section class="hero">
+        <div>
+          <span class="eyebrow"
+            >Know the signal. Understand the uncertainty.</span
+          >
+          <h1>See failure risk.<br /><em>Understand the tradeoff.</em></h1>
+          <p>
+            Explore trained machine-learning models, inspect sensor readings and
+            choose how much risk to flag for review.
+          </p>
+        </div>
+        <button class="button secondary" id="export-report">
+          Export model report ↓
+        </button>
+      </section>
+      <div class="warning">
+        <b>Research demonstration.</b> Trained on synthetic benchmark data.
+        Scores classify recorded machine states; they do not forecast when
+        equipment will fail or establish safe operating limits.
+      </div>
+      <div id="startup" class="loading" role="status">
+        Loading the trained model registry…
+      </div>
+      <div id="global-error" class="error" role="alert"></div>
+      <div id="app" class="hidden">
+        <section class="panel">
+          <div class="controls">
+            <label
+              >Model version<select id="model">
+                <option value="rf-v1">Random forest · rf-v1</option>
+                <option value="lr-v1">Logistic regression · lr-v1</option>
+              </select></label
+            ><label class="threshold"
+              >Flagging threshold <span id="threshold-value">0.46</span
+              ><input
+                id="threshold"
+                type="range"
+                min="1"
+                max="99"
+                value="46"
+              /><span class="field-note"
+                >Scores at or above this threshold are flagged.</span
+              ></label
+            ><button class="button secondary small" id="reset">
+              Restore frozen policy
+            </button>
+          </div>
+          <div class="muted" id="policy-note"></div>
+        </section>
+        <section id="view-predict">
+          <div class="tabs" role="tablist" aria-label="Prediction mode">
+            <button
+              class="tab active"
+              id="single-tab"
+              role="tab"
+              aria-selected="true"
+            >
+              Single observation</button
+            ><button
+              class="tab"
+              id="batch-tab"
+              role="tab"
+              aria-selected="false"
+            >
+              CSV batch analysis
+            </button>
+          </div>
+          <div id="single-view" class="grid">
+            <section class="panel">
+              <div class="panel-top">
+                <div>
+                  <h2>Machine observation</h2>
+                  <p>Six sensor and product inputs. Use the displayed units.</p>
+                </div>
+                <span class="version" id="input-version">rf-v1</span>
+              </div>
+              <label style="margin-bottom: 18px"
+                >Benchmark example<select id="sample">
+                  <option value="">Custom observation</option>
+                </select></label
+              >
+              <form id="prediction-form">
+                <div class="inputs">
+                  <label
+                    >Product type<select id="type">
+                      <option>L</option>
+                      <option>M</option>
+                      <option>H</option></select
+                    ><span class="field-note"
+                      >Product quality category</span
+                    ></label
+                  ><label
+                    >Air temperature · K<input
+                      id="air"
+                      type="number"
+                      step="any"
+                      min="250"
+                      max="400"
+                      value="300"
+                    /><span class="field-note">Kelvin, not Celsius</span></label
+                  ><label
+                    >Process temperature · K<input
+                      id="process"
+                      type="number"
+                      step="any"
+                      min="250"
+                      max="450"
+                      value="310" /></label
+                  ><label
+                    >Rotational speed · rpm<input
+                      id="speed"
+                      type="number"
+                      step="any"
+                      min="100"
+                      max="10000"
+                      value="1500" /></label
+                  ><label
+                    >Torque · Nm<input
+                      id="torque"
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="200"
+                      value="40" /></label
+                  ><label
+                    >Tool wear · min<input
+                      id="wear"
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="1000"
+                      value="100"
+                  /></label>
+                </div>
+                <p class="muted" style="margin-top: 16px">
+                  A blank numeric field uses its training-set median.
+                  Out-of-range readings are flagged with a warning.
+                </p>
+                <div class="form-actions">
+                  <button class="button" id="predict-button">
+                    Analyze observation →</button
+                  ><span class="muted">Inference runs on the server.</span>
+                </div>
+              </form>
+              <p id="predict-error" class="error" role="alert"></p>
+            </section>
+            <section class="panel">
+              <div class="panel-top">
+                <h2>Prediction evidence</h2>
+                <span class="pill">Model output</span>
+              </div>
+              <div id="prediction" aria-live="polite">
+                <div class="empty">
+                  Analyze an observation to see its failure-class score, policy
+                  decision and input checks.
+                </div>
+              </div>
+              <div class="ghost">
+                A model score is not a calibrated failure probability. The
+                threshold controls review decisions, not the machine's operating
+                condition.
+              </div>
+            </section>
+          </div>
+          <section id="batch-view" class="panel hidden">
+            <div class="panel-top">
+              <div>
+                <h2>Analyze a batch</h2>
+                <p>
+                  Up to 100 observations. Invalid rows are reported
+                  individually.
+                </p>
+              </div>
+              <button class="button secondary small" id="template">
+                Download sample CSV ↓
+              </button>
+            </div>
+            <label
+              >CSV content<textarea
+                id="csv"
+                spellcheck="false"
+                placeholder="type,air,process,speed,torque,wear&#10;L,300,310,1500,40,100"
+              ></textarea>
+            </label>
+            <div class="batch-actions">
+              <input
+                id="csv-file"
+                type="file"
+                accept=".csv,text/csv"
+                aria-label="Choose CSV file"
+              /><button id="batch-button" class="button">Analyze batch →</button
+              ><button id="export-batch" disabled class="button secondary">
+                Export results ↓
+              </button>
+            </div>
+            <p class="muted">
+              Required headers: <code>type,air,process,speed,torque,wear</code>.
+              Uploads are processed for this request and not saved by the
+              application.
+            </p>
+            <p id="batch-error" class="error" role="alert"></p>
+            <div id="batch-result" aria-live="polite"></div>
+          </section>
+        </section>
+        <section id="view-evaluate" class="hidden">
+          <div id="eval-cards" class="cards"></div>
+          <div class="notice">
+            The frozen model and threshold were chosen using validation data.
+            Moving this threshold explores the held-out test set; it does not
+            retrain a model or create a new unbiased evaluation.
+          </div>
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-top">
+                <div>
+                  <h2>The cost of a decision</h2>
+                  <p>Held-out test set · 2,000 observations</p>
+                </div>
+                <span class="version" id="eval-version"></span>
+              </div>
+              <div id="matrix" class="matrix"></div>
+              <div class="controls" style="margin-top: 22px">
+                <label
+                  >False alarm cost · units<input
+                    id="fp-cost"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value="1"
+                    required /></label
+                ><label
+                  >Missed failure cost · units<input
+                    id="fn-cost"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value="20"
+                    required /></label
+                ><button class="button small" id="recalculate">
+                  Recalculate
+                </button>
+              </div>
+              <div class="model-note" id="cost-result"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-top">
+                <div>
+                  <h2>Threshold tradeoff</h2>
+                  <p>Test-set precision and recall across score thresholds.</p>
+                </div>
+              </div>
+              <div id="curve"></div>
+              <div class="legend">
+                <b>● Precision</b><i>● Recall</i
+                ><span>Dashed: current threshold</span>
+              </div>
+              <div class="model-note">
+                A lower threshold often catches more failures while adding false
+                alarms. These curves describe this benchmark only.
+              </div>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-top">
+              <div>
+                <h2>Compare the frozen models</h2>
+                <p>
+                  Both models evaluated at the frozen threshold. AP summarizes
+                  the precision–recall ranking; higher is better.
+                </p>
+              </div>
+            </div>
+            <div id="comparison"></div>
+            <p class="muted">
+              An always-healthy classifier achieves 96.6% accuracy here and
+              detects no failures. Accuracy alone hides that failure.
+            </p>
+          </section>
+        </section>
+        <section id="view-experiments" class="hidden">
+          <section class="panel">
+            <div class="panel-top">
+              <div>
+                <h2>Save a policy experiment</h2>
+                <p>
+                  Store a named snapshot of your model, threshold, costs and
+                  test metrics.
+                </p>
+              </div>
+            </div>
+            <div class="controls">
+              <label
+                >Experiment name<input
+                  id="experiment-name"
+                  maxlength="60"
+                  placeholder="High-recall review policy" /></label
+              ><button class="button" id="save-experiment">
+                Save current policy</button
+              ><button class="button secondary" id="export-experiments">
+                Export snapshots ↓
+              </button>
+            </div>
+            <p id="save-status" class="status" role="status"></p>
+            <div class="notice">
+              Snapshots live in this browser only (up to 20). They are policy
+              experiments using frozen models, not new training runs. Export a
+              backup before clearing browser data.
+            </div>
+            <div id="saved-list"></div>
+          </section>
+        </section>
+        <section id="view-card" class="hidden">
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-top">
+                <h2>Model card & provenance</h2>
+                <span class="version">v1.0.0</span>
+              </div>
+              <h3>Intended use</h3>
+              <p>
+                Learning, reproducible model comparison and exploring
+                classification policies for machine observations.
+              </p>
+              <h3 style="margin-top: 20px">Dataset</h3>
+              <p>
+                UCI AI4I 2020 · 10,000 synthetic observations · 339 failure
+                labels. The binary target is <code>Machine failure</code>.
+              </p>
+              <p>
+                <a
+                  href="https://archive.ics.uci.edu/dataset/601/ai4i"
+                  target="_blank"
+                  rel="noopener"
+                  >Dataset and attribution ↗</a
+                >
+                · CC BY 4.0 · DOI 10.24432/C5HS5C
+              </p>
+              <div
+                class="split"
+                aria-label="60% training, 20% validation, 20% test"
+              >
+                <span></span><span></span><span></span>
+              </div>
+              <p class="muted">
+                6,000 train · 2,000 validation · 2,000 test. Stratified split,
+                seed 42.
+              </p>
+              <details open>
+                <summary>Preprocessing and leakage controls</summary>
+                <p>
+                  Numeric medians and logistic scaling are fit on training data
+                  only. Inputs include six observed features plus temperature
+                  gap, mechanical power and wear × torque. Product category uses
+                  fixed one-hot encoding. UID, Product ID and all failure-mode
+                  labels are excluded.
+                </p>
+              </details>
+              <details>
+                <summary>Model selection and imbalance</summary>
+                <p>
+                  Two fixed candidates use class weighting. Validation average
+                  precision chooses the model; validation F2 chooses the
+                  threshold over 0.05–0.95 in steps of 0.01. F2 emphasizes
+                  recall. The test set is never used for that selection. No
+                  oversampling, hyperparameter search or calibration is claimed.
+                </p>
+              </details>
+              <details>
+                <summary>Limits and responsible interpretation</summary>
+                <p>
+                  This benchmark encodes synthetic physical rules. A stratified
+                  random split can share operating regimes across sets. Neither
+                  field performance, remaining useful life, causal explanations
+                  nor industrial safety is validated. Missing inputs may degrade
+                  results. Models have not been calibrated; scores are not
+                  reliable real-world probabilities.
+                </p>
+              </details>
+              <details>
+                <summary>Deployment and privacy</summary>
+                <p>
+                  Python trains the models offline. Numeric parameters are
+                  exported to JSON. A Node API serves matching inference on
+                  Vercel without Python runtime dependencies or a paid AI API.
+                  Application code does not persist sensor submissions. Hosting
+                  providers may retain request metadata. Saved policies remain
+                  in localStorage.
+                </p>
+              </details>
+              <div id="provenance" class="model-note"></div>
+            </section>
+            <div>
+              <section class="panel">
+                <div class="panel-top">
+                  <div>
+                    <h2>Which signals matter?</h2>
+                    <p>Validation permutation importance · decrease in AP.</p>
+                  </div>
+                </div>
+                <div id="importance"></div>
+                <p class="muted">
+                  Global, model-specific association—not a causal or
+                  per-observation explanation. Correlated inputs can mask each
+                  other's importance. Values use three seeded repeats.
+                </p>
+              </section>
+              <section class="panel">
+                <div class="panel-top">
+                  <div>
+                    <h2>Ordered-row stress check</h2>
+                    <p>
+                      A separately retrained model uses rows 1–6,000 for
+                      training, 6,001–8,000 for validation and the last 2,000
+                      for testing.
+                    </p>
+                  </div>
+                </div>
+                <div id="chronological"></div>
+                <p class="muted">
+                  Thresholds are selected on that split's validation set. Row
+                  order is only a stress proxy; no actual timestamps or
+                  independent machine IDs establish a true prospective
+                  evaluation.
+                </p>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+      <footer>
+        FailureScope · Classical ML, reproducible evidence · Synthetic benchmark
+        demonstration
+      </footer>
+    </main>
+    <script>
+      "use strict";
+      const $ = (s) => document.querySelector(s),
+        esc = (x) =>
+          String(x ?? "").replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[c],
+          );
+      const pct = (x) => (100 * x).toFixed(1) + "%",
+        names = {
+          predict: "Prediction lab",
+          evaluate: "Model evaluation",
+          experiments: "Saved experiments",
+          card: "Model card",
+        };
+      let registry,
+        metrics,
+        batchResult = null,
+        currentPrediction = null,
+        saved = [],
+        evalToken = 0,
+        predToken = 0;
+      const config = () => ({
+        model: $("#model").value,
+        threshold: Number($("#threshold").value) / 100,
+        falseAlarmCost: Number($("#fp-cost").value),
+        missCost: Number($("#fn-cost").value),
+      });
+      async function api(path, data) {
+        const res = await fetch(
+          "/api/" + path,
+          data === undefined
+            ? {}
+            : {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              },
+        );
+        let body;
+        try {
+          body = await res.json();
+        } catch {
+          throw Error("The server returned an unexpected response. Try again.");
+        }
+        if (!res.ok) throw Error(body.error || "Request failed");
+        return body;
+      }
+      function download(name, text, type = "application/json") {
+        const url = URL.createObjectURL(new Blob([text], { type }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      function table(rows, cols) {
+        return (
+          '<div class="table-wrap"><table><thead><tr>' +
+          cols.map((c) => "<th>" + esc(c[0]) + "</th>").join("") +
+          "</tr></thead><tbody>" +
+          rows
+            .map(
+              (r) =>
+                "<tr>" +
+                cols.map((c) => "<td>" + esc(c[1](r)) + "</td>").join("") +
+                "</tr>",
+            )
+            .join("") +
+          "</tbody></table></div>"
+        );
+      }
+      function view(name) {
+        document
+          .querySelectorAll('[id^="view-"]')
+          .forEach((e) =>
+            e.classList.toggle("hidden", e.id !== "view-" + name),
+          );
+        document.querySelectorAll(".nav").forEach((e) => {
+          e.classList.toggle("active", e.dataset.view === name);
+          e.setAttribute(
+            "aria-current",
+            e.dataset.view === name ? "page" : "false",
+          );
+        });
+        $("#crumb").textContent = names[name];
+      }
+      function setPolicy() {
+        const c = config();
+        $("#threshold-value").textContent = c.threshold.toFixed(2);
+        $("#input-version").textContent = c.model;
+        $("#eval-version").textContent = c.model;
+        $("#policy-note").textContent =
+          "Frozen choice: " +
+          registry.models[registry.selected].name +
+          " at " +
+          registry.threshold.toFixed(2) +
+          ". Current policy: " +
+          c.model +
+          " at " +
+          c.threshold.toFixed(2) +
+          ".";
+      }
+      async function evaluate() {
+        const token = ++evalToken;
+        setPolicy();
+        $("#global-error").textContent = "";
+        try {
+          const m = await api("evaluate", config());
+          if (token !== evalToken) return;
+          metrics = m;
+          renderEvaluation();
+          renderImportance();
+          return m;
+        } catch (e) {
+          if (token === evalToken) $("#global-error").textContent = e.message;
+          throw e;
+        }
+      }
+      function renderEvaluation() {
+        const m = metrics;
+        $("#eval-cards").innerHTML = [
+          [
+            "Recall",
+            pct(m.recall),
+            m.tp + " of " + m.positives + " failures detected",
+          ],
+          ["Precision", pct(m.precision), m.fp + " false alarms"],
+          [
+            "Average precision",
+            m.averagePrecision.toFixed(3),
+            "Threshold-independent test ranking",
+          ],
+          ["Review workload", String(m.flagged), m.n + " test observations"],
+        ]
+          .map(
+            (x) =>
+              '<div class="card"><small>' +
+              x[0] +
+              "</small><strong>" +
+              x[1] +
+              "</strong><span>" +
+              x[2] +
+              "</span></div>",
+          )
+          .join("");
+        $("#matrix").innerHTML = [
+          ["True positives", m.tp, "Failure correctly flagged", false],
+          ["False positives", m.fp, "Healthy observation flagged", true],
+          ["False negatives", m.fn, "Failure missed by the policy", true],
+          ["True negatives", m.tn, "Healthy observation unflagged", false],
+        ]
+          .map(
+            (x) =>
+              '<div class="cell ' +
+              (x[3] ? "bad" : "") +
+              '"><span>' +
+              x[0] +
+              "</span><strong>" +
+              x[1] +
+              "</strong><span>" +
+              x[2] +
+              "</span></div>",
+          )
+          .join("");
+        $("#cost-result").textContent =
+          "Illustrative cost: " +
+          m.cost +
+          " units = " +
+          m.fp +
+          " false alarms × " +
+          m.falseAlarmCost +
+          " + " +
+          m.fn +
+          " missed failures × " +
+          m.missCost +
+          ". These are chosen weights, not measured financial losses.";
+        $("#comparison").innerHTML = table(Object.values(registry.models), [
+          ["MODEL", (r) => r.name],
+          ["VERSION", (r) => r.version],
+          ["AP", (r) => r.test.averagePrecision.toFixed(3)],
+          ["RECALL", (r) => pct(r.test.recall)],
+          ["PRECISION", (r) => pct(r.test.precision)],
+          ["Brier ↓", (r) => r.test.brier.toFixed(3)],
+        ]);
+        renderCurve();
+      }
+      function renderCurve() {
+        const curve = registry.curves[config().model],
+          W = 480,
+          H = 235,
+          left = 40,
+          top = 15,
+          w = 420,
+          h = 180;
+        const line = (k) =>
+          curve
+            .map(
+              (d, i) =>
+                (i ? "L" : "M") +
+                (left + d.threshold * w).toFixed(1) +
+                "," +
+                (top + (1 - d[k]) * h).toFixed(1),
+            )
+            .join(" ");
+        const tx = left + config().threshold * w;
+        $("#curve").innerHTML =
+          '<svg class="chart" viewBox="0 0 ' +
+          W +
+          " " +
+          H +
+          '" role="img" aria-label="Precision and recall by threshold">' +
+          [0, 0.5, 1]
+            .map(
+              (t) =>
+                '<line x1="40" y1="' +
+                (top + (1 - t) * h) +
+                '" x2="460" y2="' +
+                (top + (1 - t) * h) +
+                '" stroke="#e2e9e8"/><text x="8" y="' +
+                (top + (1 - t) * h + 4) +
+                '" font-size="10" fill="#687a84">' +
+                pct(t) +
+                "</text>",
+            )
+            .join("") +
+          '<path d="' +
+          line("precision") +
+          '" fill="none" stroke="#087e80" stroke-width="2.5"/><path d="' +
+          line("recall") +
+          '" fill="none" stroke="#d78b28" stroke-width="2.5"/><line x1="' +
+          tx +
+          '" x2="' +
+          tx +
+          '" y1="15" y2="195" stroke="#617881" stroke-dasharray="4 4"/>' +
+          [0, 0.25, 0.5, 0.75, 1]
+            .map(
+              (t) =>
+                '<text x="' +
+                (left + t * w) +
+                '" y="217" text-anchor="middle" font-size="10" fill="#687a84">' +
+                t.toFixed(2) +
+                "</text>",
+            )
+            .join("") +
+          "</svg>";
+      }
+      function renderImportance() {
+        const c = config(),
+          imp = [...registry.models[c.model].importance].sort(
+            (a, b) => b.drop - a.drop,
+          ),
+          max = Math.max(...imp.map((x) => Math.abs(x.drop)), 0.001);
+        $("#importance").innerHTML = imp
+          .map(
+            (r) =>
+              '<div class="importance"><span>' +
+              esc(r.feature) +
+              '</span><div class="bar"><span style="width:' +
+              Math.max(0, (r.drop / max) * 100) +
+              '%"></span></div><span>' +
+              r.drop.toFixed(3) +
+              "</span></div>",
+          )
+          .join("");
+        $("#chronological").innerHTML = table(
+          Object.entries(registry.chronological).map(([k, v]) => ({ k, ...v })),
+          [
+            ["MODEL", (r) => r.k],
+            ["THRESHOLD", (r) => r.threshold.toFixed(2)],
+            ["TEST AP", (r) => r.test.averagePrecision.toFixed(3)],
+            ["RECALL", (r) => pct(r.test.recall)],
+          ],
+        );
+      }
+      function showPrediction(r) {
+        currentPrediction = r;
+        $("#prediction").innerHTML =
+          '<div class="result-box"><span class="flag ' +
+          (r.flagged ? "high" : "") +
+          '">' +
+          (r.flagged ? "FLAGGED FOR REVIEW" : "BELOW REVIEW THRESHOLD") +
+          '</span><div class="score">' +
+          pct(r.score) +
+          ' <small>failure-class score</small></div><div class="meter"><span style="width:' +
+          100 * r.score +
+          '%"></span></div><p class="muted">' +
+          esc(r.modelVersion) +
+          " · threshold " +
+          r.threshold.toFixed(2) +
+          "</p></div>" +
+          (r.warnings.length
+            ? '<ul class="hint-list">' +
+              r.warnings.map((w) => "<li>" + esc(w) + "</li>").join("") +
+              "</ul>"
+            : '<p class="muted">All submitted values are within the training ranges. This does not guarantee an accurate prediction.</p>');
+      }
+      async function analyze() {
+        const token = ++predToken;
+        $("#predict-error").textContent = "";
+        $("#predict-button").disabled = true;
+        try {
+          const row = { type: $("#type").value };
+          ["air", "process", "speed", "torque", "wear"].forEach(
+            (k) =>
+              (row[k] =
+                $("#" + k).value.trim() === ""
+                  ? null
+                  : Number($("#" + k).value)),
+          );
+          const r = await api("predict", { row, ...config() });
+          if (token === predToken) showPrediction(r);
+        } catch (e) {
+          $("#predict-error").textContent = e.message;
+        } finally {
+          $("#predict-button").disabled = false;
+        }
+      }
+      function renderSaved() {
+        const html = saved
+          .map(
+            (r, i) =>
+              '<div class="saved-row"><div><h3>' +
+              esc(r.name) +
+              '</h3><div class="muted">' +
+              esc(new Date(r.created).toLocaleString()) +
+              " · " +
+              esc(r.config.model) +
+              " · threshold " +
+              r.config.threshold.toFixed(2) +
+              " · recall " +
+              pct(r.metrics.recall) +
+              " · precision " +
+              pct(r.metrics.precision) +
+              '</div></div><div><button class="button secondary small restore" data-i="' +
+              i +
+              '">Restore policy</button><button class="button secondary small remove" data-i="' +
+              i +
+              '">Delete</button></div></div>',
+          )
+          .join("");
+        $("#saved-list").innerHTML =
+          html ||
+          '<div class="empty">No saved experiments yet. Try a threshold and save the policy here.</div>';
+        document.querySelectorAll(".restore").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const r = saved[+b.dataset.i];
+              $("#model").value = r.config.model;
+              $("#threshold").value = Math.round(100 * r.config.threshold);
+              $("#fp-cost").value = r.config.falseAlarmCost;
+              $("#fn-cost").value = r.config.missCost;
+              evaluate()
+                .then(() => {
+                  view("evaluate");
+                  invalidateOutputs();
+                })
+                .catch(() => {});
+            }),
+        );
+        document.querySelectorAll(".remove").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const next = saved.filter((_, i) => i !== +b.dataset.i);
+              try {
+                localStorage.setItem(
+                  "failurescope-experiments-v1",
+                  JSON.stringify(next),
+                );
+                saved = next;
+                renderSaved();
+              } catch {
+                $("#save-status").textContent =
+                  "Could not update browser storage. Export your snapshots.";
+              }
+            }),
+        );
+      }
+      function invalidateOutputs() {
+        ++predToken;
+        currentPrediction = null;
+        batchResult = null;
+        $("#prediction").innerHTML =
+          '<div class="empty">Policy changed. Analyze the observation again to refresh its evidence.</div>';
+        $("#batch-result").innerHTML = "";
+        $("#export-batch").disabled = true;
+      }
+      document
+        .querySelectorAll(".nav")
+        .forEach((b) => (b.onclick = () => view(b.dataset.view)));
+      $("#threshold").oninput = () => {
+        $("#threshold-value").textContent = (
+          +$("#threshold").value / 100
+        ).toFixed(2);
+        invalidateOutputs();
+      };
+      $("#threshold").onchange = () => evaluate().catch(() => {});
+      $("#model").onchange = () => {
+        invalidateOutputs();
+        evaluate().catch(() => {});
+      };
+      $("#reset").onclick = () => {
+        $("#model").value = registry.selected;
+        $("#threshold").value = Math.round(registry.threshold * 100);
+        invalidateOutputs();
+        evaluate().catch(() => {});
+      };
+      $("#recalculate").onclick = () => evaluate().catch(() => {});
+      $("#prediction-form").onsubmit = (e) => {
+        e.preventDefault();
+        analyze();
+      };
+      ["single", "batch"].forEach(
+        (n) =>
+          ($("#" + n + "-tab").onclick = () => {
+            ["single", "batch"].forEach((k) => {
+              $("#" + k + "-view").classList.toggle("hidden", n !== k);
+              $("#" + k + "-tab").classList.toggle("active", n === k);
+              $("#" + k + "-tab").setAttribute(
+                "aria-selected",
+                String(n === k),
+              );
+            });
+          }),
+      );
+      $("#sample").onchange = () => {
+        const r = registry.samples[+$("#sample").value];
+        if ($("#sample").value === "" || !r) return;
+        Object.entries(r.row).forEach(([k, v]) => ($("#" + k).value = v));
+        $("#prediction").innerHTML =
+          '<p class="muted">Loaded a benchmark observation (known label: ' +
+          (r.actual ? "failure" : "healthy") +
+          "). Analyze it to run server inference.</p>";
+      };
+      ["type", "air", "process", "speed", "torque", "wear"].forEach(
+        (k) =>
+          ($("#" + k).oninput = () => {
+            $("#sample").value = "";
+            ++predToken;
+            $("#prediction").innerHTML =
+              '<div class="empty">Inputs changed. Analyze again to refresh the result.</div>';
+          }),
+      );
+      const sampleCSV =
+        "type,air,process,speed,torque,wear\nL,300,310,1500,40,100\nM,300,308,1300,70,220\nH,,310,1600,35,80\n";
+      $("#template").onclick = () =>
+        download("failurescope-sample.csv", sampleCSV, "text/csv");
+      $("#csv-file").onchange = async () => {
+        const f = $("#csv-file").files[0];
+        if (!f) return;
+        if (f.size > 90000) {
+          $("#batch-error").textContent = "CSV file must be below 90 KB.";
+          return;
+        }
+        $("#csv").value = await f.text();
+        batchResult = null;
+        $("#batch-result").innerHTML = "";
+        $("#export-batch").disabled = true;
+      };
+      $("#csv").oninput = () => {
+        batchResult = null;
+        $("#batch-result").innerHTML = "";
+        $("#export-batch").disabled = true;
+      };
+      $("#batch-button").onclick = async () => {
+        $("#batch-error").textContent = "";
+        $("#batch-button").disabled = true;
+        batchResult = null;
+        $("#batch-result").innerHTML = "";
+        $("#export-batch").disabled = true;
+        try {
+          const submitted = config();
+          const r = await api("batch", { csv: $("#csv").value, ...submitted });
+          if (
+            submitted.model !== config().model ||
+            submitted.threshold !== config().threshold
+          )
+            throw Error("Policy changed during analysis. Run the batch again.");
+          batchResult = r;
+          $("#batch-result").innerHTML =
+            '<div class="notice">' +
+            r.summary.valid +
+            " valid · " +
+            r.summary.invalid +
+            " invalid · " +
+            r.summary.flagged +
+            " flagged · " +
+            esc(r.model) +
+            " at " +
+            r.threshold.toFixed(2) +
+            "</div>" +
+            table(r.rows, [
+              ["CSV ROW", (r) => r.rowNumber],
+              ["SCORE", (r) => (r.error ? "—" : pct(r.score))],
+              [
+                "DECISION",
+                (r) =>
+                  r.error
+                    ? "INVALID"
+                    : r.flagged
+                      ? "Review"
+                      : "Below threshold",
+              ],
+              [
+                "INPUT CHECKS",
+                (r) =>
+                  r.error || r.warnings.join("; ") || "Within training ranges",
+              ],
+            ]);
+          $("#export-batch").disabled = false;
+        } catch (e) {
+          $("#batch-error").textContent = e.message;
+        } finally {
+          $("#batch-button").disabled = false;
+        }
+      };
+      $("#export-batch").onclick = () => {
+        if (batchResult)
+          download(
+            "failurescope-batch-results.json",
+            JSON.stringify(batchResult, null, 2),
+          );
+      };
+      $("#export-report").onclick = () => {
+        if (registry)
+          download(
+            "failurescope-model-report.json",
+            JSON.stringify(registry, null, 2),
+          );
+      };
+      $("#save-experiment").onclick = async () => {
+        $("#save-status").textContent = "";
+        const name = $("#experiment-name").value.trim();
+        if (!name) {
+          $("#save-status").textContent = "Enter a name for the experiment.";
+          return;
+        }
+        try {
+          const before = JSON.stringify(config());
+          const measured = await evaluate();
+          if (!measured || JSON.stringify(config()) !== before)
+            throw Error("Policy changed during save; try again.");
+          const snapshot = {
+            name,
+            created: new Date().toISOString(),
+            registryVersion: registry.version,
+            datasetSha256: registry.dataset.sha256,
+            config: config(),
+            metrics: { ...measured },
+          };
+          const next = [snapshot, ...saved].slice(0, 20);
+          localStorage.setItem(
+            "failurescope-experiments-v1",
+            JSON.stringify(next),
+          );
+          saved = next;
+          renderSaved();
+          $("#save-status").textContent =
+            "Saved in this browser. Export snapshots for a portable backup.";
+        } catch (e) {
+          $("#save-status").textContent = "Could not save: " + e.message;
+        }
+      };
+      $("#export-experiments").onclick = () =>
+        download(
+          "failurescope-policy-experiments.json",
+          JSON.stringify(saved, null, 2),
+        );
+      async function init() {
+        try {
+          registry = await api("report");
+          $("#model").value = registry.selected;
+          $("#threshold").value = Math.round(registry.threshold * 100);
+          $("#sample").innerHTML =
+            '<option value="">Custom observation</option>' +
+            registry.samples
+              .map(
+                (r, i) =>
+                  '<option value="' + i + '">' + esc(r.label) + "</option>",
+              )
+              .join("");
+          $("#provenance").innerHTML =
+            'Dataset SHA-256<br><code style="word-break:break-all">' +
+            esc(registry.dataset.sha256) +
+            "</code><br><br>Training runtime: Python " +
+            esc(registry.runtime.python) +
+            ", scikit-learn " +
+            esc(registry.runtime.sklearn) +
+            ". Numeric artifacts are exported at full precision; serving parity is tested against Python.";
+          try {
+            const s = JSON.parse(
+              localStorage.getItem("failurescope-experiments-v1") || "[]",
+            );
+            if (Array.isArray(s))
+              saved = s
+                .filter(
+                  (r) =>
+                    r &&
+                    typeof r.name === "string" &&
+                    r.name.length <= 60 &&
+                    r.registryVersion === registry.version &&
+                    registry.models[r.config?.model] &&
+                    Number.isFinite(r.config?.threshold) &&
+                    r.config.threshold >= 0.01 &&
+                    r.config.threshold <= 0.99 &&
+                    r.metrics &&
+                    Number.isFinite(r.metrics.precision) &&
+                    Number.isFinite(r.metrics.recall),
+                )
+                .slice(0, 20);
+          } catch {
+            saved = [];
+          }
+          renderSaved();
+          await evaluate();
+          $("#startup").classList.add("hidden");
+          $("#app").classList.remove("hidden");
+        } catch (e) {
+          $("#startup").textContent =
+            "Unable to load the model registry. Refresh to retry.";
+          $("#global-error").textContent = e.message;
+        }
+      }
+      init();
+    </script>
+  </body>
+</html>
